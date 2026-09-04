@@ -307,21 +307,57 @@ class FlowSplit(gl.Contract):
             """,
         )
 
-        proposal = json.loads(proposal_json)
+        # ---- parse the AI proposal ----
+        try:
+            proposal = json.loads(proposal_json)
+        except Exception:
+            raise gl.vm.UserError("AI proposal was not valid JSON")
 
-        for contributor in self.contributors:
-            self.previous_percentages[contributor] = self.percentages.get(
-                contributor, u256(0)
-            )
+        if not isinstance(proposal, dict):
+            raise gl.vm.UserError("AI proposal must be a JSON object")
 
+        # ---- validate the AI proposal in full BEFORE writing any state ----
+        # Nothing is committed unless every check below passes, so a bad
+        # proposal can never leave the split in an inconsistent state.
+        proposed = {}
         new_total = 0
         for contributor in self.contributors:
             addr_str = str(contributor)
-            pct = int(proposal.get(addr_str, current_split.get(addr_str, 0)))
+
+            if addr_str not in proposal:
+                raise gl.vm.UserError("AI proposal is missing a contributor")
+
+            raw_value = proposal[addr_str]
+            if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
+                raise gl.vm.UserError("AI proposal contained a non-numeric percentage")
+
+            pct = int(raw_value)
+
             if pct < 0 or pct > 100:
                 raise gl.vm.UserError("AI proposal contained an out-of-range percentage")
-            self.percentages[contributor] = u256(pct)
+
+            current_pct = int(current_split.get(addr_str, 0))
+            change = pct - current_pct
+            if change < 0:
+                change = -change
+            if change > 15:
+                raise gl.vm.UserError(
+                    "AI proposal changed a percentage by more than 15 points"
+                )
+
+            proposed[addr_str] = pct
             new_total = new_total + pct
+
+        if new_total != 100:
+            raise gl.vm.UserError("AI proposal percentages must sum to exactly 100")
+
+        # ---- proposal is valid: commit it ----
+        for contributor in self.contributors:
+            addr_str = str(contributor)
+            self.previous_percentages[contributor] = self.percentages.get(
+                contributor, u256(0)
+            )
+            self.percentages[contributor] = u256(proposed[addr_str])
 
         self.total_percentage = u256(new_total)
         self.ai_proposal_raw = proposal_json

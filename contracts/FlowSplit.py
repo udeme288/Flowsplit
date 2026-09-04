@@ -42,18 +42,18 @@ class FlowSplit(gl.Contract):
         self.period_active = False
         self.period_rebalanced = False
 
-        self.contributors = TreeMap()
-        self.percentages = TreeMap()
-        self.previous_percentages = TreeMap()
+        self.contributors = gl.storage.inmem_allocate(TreeMap[Address, bool])
+        self.percentages = gl.storage.inmem_allocate(TreeMap[Address, u256])
+        self.previous_percentages = gl.storage.inmem_allocate(TreeMap[Address, u256])
 
-        self.evidence = TreeMap()
-        self.evidence_source = TreeMap()
+        self.evidence = gl.storage.inmem_allocate(TreeMap[Address, str])
+        self.evidence_source = gl.storage.inmem_allocate(TreeMap[Address, str])
 
-        self.evaluation_score = TreeMap()
-        self.evaluation_status = TreeMap()
+        self.evaluation_score = gl.storage.inmem_allocate(TreeMap[Address, u256])
+        self.evaluation_status = gl.storage.inmem_allocate(TreeMap[Address, bool])
 
-        self.dispute_flag = TreeMap()
-        self.dispute_reason = TreeMap()
+        self.dispute_flag = gl.storage.inmem_allocate(TreeMap[Address, bool])
+        self.dispute_reason = gl.storage.inmem_allocate(TreeMap[Address, str])
 
         self.ai_proposal_raw = ""
 

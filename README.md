@@ -1,33 +1,110 @@
 FlowSplit
 
-FlowSplit is a GenLayer Intelligent Contract designed for teams that share ongoing revenue — like bands, newsletters, creators, or open-source projects.
+FlowSplit is a GenLayer contract for teams that share revenue.
 
-The problem is simple: contribution levels change, but revenue splits usually don't. FlowSplit allows the split to be reviewed and rebalanced based on what each contributor actually did during a specific period.
+It is made for groups like bands, newsletters, small creator teams, or open-source projects where the amount of work each person does can change over time.
+
+Instead of keeping the same percentage forever, FlowSplit allows the team to review contributions and update the split.
 
 How it works
-Contributors register their wallet addresses.
-An initial revenue percentage is assigned to each contributor.
-A contribution period is opened.
-Contributors submit evidence + a source URL describing their work.
+Contributors register their wallet address.
+The owner gives each contributor a starting percentage.
+The percentages must add up to 100%.
+A new contribution period is started.
+Each contributor submits a short description of their work and a link to supporting evidence.
 The period is closed.
-rebalance() sends the contribution data to GenLayer's AI-validator consensus.
-Validators independently evaluate the contributions and reach an agreed interpretation of a fair new split.
-The new percentages are applied, with a 15-point maximum movement per period to reduce extreme or manipulated results.
-Contributors can dispute the result if they believe the rebalance is unfair.
-Why GenLayer?
+The contract uses the submitted information and contribution scores to create a new proposed split.
+The new split is checked before it is saved.
+A contributor's percentage cannot move by more than 15 points in one rebalance.
+A contributor can dispute the new split if they believe it is unfair.
+Main functions
+register_contributor()
 
-A traditional smart contract is good at deterministic rules, but it can't easily answer subjective questions like:
+Adds a contributor to the contract.
 
-"Was this contribution actually valuable to the project?"
+set_percentage()
 
-FlowSplit uses GenLayer's Equivalence Principle and LLM-based validators to evaluate this type of unstructured information and reach consensus.
+Sets a contributor's current revenue percentage.
 
-So the contract combines:
+The total percentage cannot go above 100.
 
-on-chain rules + contributor evidence + AI evaluation + validator consensus = dynamic revenue splitting.
+start_period()
 
-Current version
+Starts a new contribution period.
 
-The current version tracks the revenue percentages but doesn't transfer the actual GEN/revenue yet. Evidence is also submitted as text and a URL; future versions can use GenLayer's web capabilities to fetch and verify the linked evidence directly.
+The current split must already equal 100%.
 
-The main idea: FlowSplit turns a fixed revenue agreement into a system that can adapt to the work people are actually doing.
+submit_evidence()
+
+A contributor submits:
+
+What they worked on
+A URL showing supporting evidence
+record_evaluation()
+
+The owner can record a contribution score from 0 to 100.
+
+end_period()
+
+Closes the current contribution period.
+
+rebalance()
+
+Creates a new proposed split using the contribution information.
+
+Before the new percentages are saved, the contract checks that:
+
+Every contributor is included
+Percentages are valid
+The total equals 100
+No percentage changes by more than 15 points
+
+If any check fails, the new split is not saved.
+
+dispute_rebalance()
+
+A contributor can flag a rebalance and give a reason.
+
+resolve_dispute()
+
+The owner can resolve a dispute and, if needed, restore the previous percentages.
+
+Checking the contract
+
+The contract includes read-only functions for checking things such as:
+
+Current period
+Number of contributors
+Current percentages
+Previous percentages
+Submitted evidence
+Contribution scores
+Disputes
+The latest proposed split
+
+There is also get_full_split() for viewing the complete current split.
+
+Why FlowSplit?
+
+Revenue sharing can become difficult when people's roles change.
+
+Someone may do much more work in one month and much less the next. A fixed agreement doesn't handle that very well.
+
+FlowSplit gives the team a way to review the work done during each period and adjust the percentages while keeping limits in place.
+
+Current limitations
+
+This version deals with percentage accounting only. It does not send the actual revenue or GEN to contributors.
+
+Also, the contract stores the evidence URL but does not currently fetch the page itself to verify it.
+
+Built with
+GenLayer
+Python
+GenLayer Storage
+GenLayer Equivalence Principle
+Project status
+
+FlowSplit is a working prototype focused on dynamic revenue splits based on contribution records.
+
+The next step would be connecting the percentages to actual payments and improving how submitted evidence is checked.

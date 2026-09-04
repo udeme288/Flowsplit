@@ -1,86 +1,33 @@
-# FlowSplit
+FlowSplit
 
-**A revenue-split contract that renegotiates itself.**
+FlowSplit is a GenLayer Intelligent Contract designed for teams that share ongoing revenue — like bands, newsletters, creators, or open-source projects.
 
-FlowSplit is a GenLayer Intelligent Contract for teams who share ongoing
-revenue — a band, a newsletter, a small open-source project — but whose
-contribution levels shift over time. Instead of a fixed split agreed once
-and never revisited, FlowSplit periodically judges what each contributor
-actually did and proposes an updated split, using GenLayer's AI-validator
-consensus instead of a human arbiter.
+The problem is simple: contribution levels change, but revenue splits usually don't. FlowSplit allows the split to be reviewed and rebalanced based on what each contributor actually did during a specific period.
 
-## Why this needs GenLayer specifically
+How it works
+Contributors register their wallet addresses.
+An initial revenue percentage is assigned to each contributor.
+A contribution period is opened.
+Contributors submit evidence + a source URL describing their work.
+The period is closed.
+rebalance() sends the contribution data to GenLayer's AI-validator consensus.
+Validators independently evaluate the contributions and reach an agreed interpretation of a fair new split.
+The new percentages are applied, with a 15-point maximum movement per period to reduce extreme or manipulated results.
+Contributors can dispute the result if they believe the rebalance is unfair.
+Why GenLayer?
 
-A normal smart contract can enforce a fixed split, or require a manual
-vote to change it. It cannot **read unstructured evidence of work** (a
-commit history, a published article, a campaign report) **and judge**
-whether it justifies a different split. That's a subjective call, not a
-deterministic one — which is exactly the gap GenLayer's validators (an
-LLM-based consensus layer) are built to fill.
+A traditional smart contract is good at deterministic rules, but it can't easily answer subjective questions like:
 
-FlowSplit's `rebalance()` function:
-1. Reads each contributor's submitted evidence for the period.
-2. Passes it to GenLayer's `eq_principle.prompt_non_comparative`, where
-   independent validators independently judge a fair updated split.
-3. Applies the result on-chain — capped so no single contributor's share
-   can swing by more than 15 points in one period, to prevent wild or
-   gamed outcomes.
+"Was this contribution actually valuable to the project?"
 
-## What's in this repo
+FlowSplit uses GenLayer's Equivalence Principle and LLM-based validators to evaluate this type of unstructured information and reach consensus.
 
-- `contracts/FlowSplit.py` — the Intelligent Contract, ready to paste into
-  [GenLayer Studio](https://studio.genlayer.com) or deploy via the CLI.
-- `docs/DEMO_SCRIPT.md` — a step-by-step walkthrough for recording a demo
-  video or for judges testing it live.
+So the contract combines:
 
-## How it works, end to end
+on-chain rules + contributor evidence + AI evaluation + validator consensus = dynamic revenue splitting.
 
-1. **`register_contributor()`** — each team member registers their address.
-2. **`set_percentage(contributor, percentage)`** — the owner sets the
-   starting split (must total 100).
-3. **`start_period()`** — opens a new evidence-collection window.
-4. **`submit_evidence(contribution_evidence, source_url)`** — each
-   contributor describes what they did and links proof (a commit, a
-   published post, a campaign report).
-5. **`record_evaluation(contributor, score)`** *(optional)* — the owner can
-   attach a 0–100 activity score per contributor before rebalancing, giving
-   the AI validators an extra signal.
-6. **`end_period()`** — closes the window.
-7. **`rebalance()`** — triggers the AI-judged split proposal and applies it.
-8. **`dispute_rebalance(reason)`** — any contributor can flag the new split
-   as unfair.
-9. **`resolve_dispute(contributor, revert_split)`** — the owner can revert
-   to the previous period's split if a dispute is upheld.
+Current version
 
-Read-only helpers (`get_full_split()`, `get_ai_proposal()`,
-`get_previous_percentage()`) expose full state for a frontend or for judges
-inspecting the contract directly.
+The current version tracks the revenue percentages but doesn't transfer the actual GEN/revenue yet. Evidence is also submitted as text and a URL; future versions can use GenLayer's web capabilities to fetch and verify the linked evidence directly.
 
-## Deploying it yourself
-
-**Studio (fastest):**
-1. Open [studio.genlayer.com](https://studio.genlayer.com).
-2. Create a new contract, paste in `contracts/FlowSplit.py`.
-3. Deploy with no constructor arguments.
-4. Call `register_contributor()` from 2–3 different test accounts (Studio
-   lets you switch the active account).
-5. Follow `docs/DEMO_SCRIPT.md` from there.
-
-**CLI:**
-```bash
-genlayer network set testnet-bradbury   # or your target network
-genlayer deploy --contract contracts/FlowSplit.py
-```
-
-## Known limitations (be upfront about these with judges)
-
-- Payouts are tracked as percentages only — this version doesn't move real
-  GEN between addresses yet. That's the natural next step, using
-  `@gl.public.write.payable` and `emit_transfer()`.
-- The dispute path is a simple owner-resolved flag, not GenLayer's native
-  on-chain appeal process — a v2 could route disputes through actual
-  re-validation instead.
-- Evidence is self-reported text + a URL, not independently fetched and
-  verified by the contract yet (a natural extension: use
-  `gl.nondet.web.get()` to pull and verify the linked page during
-  `rebalance()`).
+The main idea: FlowSplit turns a fixed revenue agreement into a system that can adapt to the work people are actually doing.

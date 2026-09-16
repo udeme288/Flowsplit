@@ -269,21 +269,27 @@ class FlowSplit(gl.Contract):
 
         current_split = {}
         lines = []
+
         for contributor in self.contributors:
             addr_str = str(contributor)
             pct = int(self.percentages.get(contributor, u256(0)))
             score = int(self.evaluation_score.get(contributor, u256(0)))
             ev = self.evidence.get(contributor, "")
             src = self.evidence_source.get(contributor, "")
+
             current_split[addr_str] = pct
+
             lines.append(
                 f"{addr_str} | current {pct}% | evaluation score {score}/100 "
-                f"| evidence: {ev} | source: {src}"
+                f"| contribution evidence: {ev} | evidence source: {src}"
             )
 
         context = (
-            "Current split (JSON): " + json.dumps(current_split) + "\n\n"
-            "Contributor activity this period:\n" + "\n".join(lines)
+            "Current split (JSON): "
+            + json.dumps(current_split)
+            + "\n\n"
+            "Contributor activity and evidence for this period:\n"
+            + "\n".join(lines)
         )
 
         def get_input() -> str:
@@ -292,22 +298,97 @@ class FlowSplit(gl.Contract):
         proposal_json = gl.eq_principle.prompt_non_comparative(
             get_input,
             task="""
-                Propose an updated percentage split reflecting each
-                contributor's actual work this period, based on the
-                evidence provided. Respond with ONLY a JSON object mapping
-                each contributor's address (exactly as given) to an
-                integer percentage.
+                Propose an updated percentage split based on the actual
+                contribution evidence submitted by each contributor during
+                this period.
+
+                The proposed split must be justified by the evidence.
+
+                For every contributor, compare their current percentage with
+                the proposed percentage and determine whether the submitted
+                evidence supports the direction and size of the change.
+
+                An increase in a contributor's percentage should only be made
+                when the evidence provides a credible basis that the
+                contributor made a meaningful contribution during the period.
+
+                A decrease should only be made when the evidence indicates
+                relatively lower contribution, lack of contribution, or when
+                the evidence for other contributors provides a credible basis
+                for reallocating part of the split.
+
+                Do not change a contributor's percentage merely to make the
+                percentages different. Do not use the evaluation score alone
+                as justification for a change.
+
+                If the evidence does not justify a change, keep that
+                contributor's current percentage.
+
+                Consider the evidence for all contributors together so that
+                increases for some contributors are justified relative to the
+                contributions of the others.
+
+                Evidence should be specific, relevant to the contributor's
+                claimed work, and sufficiently credible to support the
+                proposed allocation. Vague, irrelevant, contradictory, or
+                unsupported claims should not justify a percentage increase.
+
+                The maximum movement remains 15 percentage points per
+                contributor for this period.
+
+                Respond with ONLY a JSON object mapping each contributor's
+                address (exactly as given) to an integer percentage.
             """,
             criteria="""
-                The response is valid JSON and nothing else
-                It maps every contributor address from the input to an integer
-                The integers sum to exactly 100
-                No contributor's percentage changed by more than 15 points
-                from their current percentage shown in the input
+                The response is valid JSON and nothing else.
+
+                It maps every contributor address from the input to exactly
+                one integer percentage.
+
+                All percentages are between 0 and 100.
+
+                The percentages sum to exactly 100.
+
+                No contributor's percentage changes by more than 15 points
+                from their current percentage.
+
+                Most importantly, every proposed change must be justified by
+                the contribution evidence provided for that contributor and
+                considered in relation to the evidence provided for the other
+                contributors.
+
+                A percentage increase is justified only when the evidence
+                supports that the contributor performed meaningful work or
+                made a meaningful contribution during the period.
+
+                A percentage decrease is justified only when the evidence
+                supports relatively lower contribution, lack of contribution,
+                or a stronger evidence-based reason to allocate more of the
+                available share to other contributors.
+
+                The proposal must not increase or decrease a contributor's
+                percentage solely because of the evaluation score.
+
+                The proposal must not make a percentage change merely because
+                the change is numerically possible under the 15-point limit.
+
+                If a contributor's evidence does not support a change, their
+                current percentage should be preserved.
+
+                Evidence must be relevant to the contributor's claimed work
+                and sufficiently specific or credible to support the proposed
+                change. Vague, irrelevant, contradictory, or unsupported
+                evidence does not justify an increase.
+
+                The final allocation must represent a reasonable
+                evidence-based relationship between contribution and
+                percentage, while respecting the 15-point movement limit and
+                the requirement that the total equals 100.
             """,
         )
 
         # ---- parse the AI proposal ----
+
         try:
             proposal = json.loads(proposal_json)
         except Exception:
@@ -317,29 +398,41 @@ class FlowSplit(gl.Contract):
             raise gl.vm.UserError("AI proposal must be a JSON object")
 
         # ---- validate the AI proposal in full BEFORE writing any state ----
-        # Nothing is committed unless every check below passes, so a bad
-        # proposal can never leave the split in an inconsistent state.
+
         proposed = {}
         new_total = 0
+
         for contributor in self.contributors:
             addr_str = str(contributor)
 
             if addr_str not in proposal:
-                raise gl.vm.UserError("AI proposal is missing a contributor")
+                raise gl.vm.UserError(
+                    "AI proposal is missing a contributor"
+                )
 
             raw_value = proposal[addr_str]
-            if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
-                raise gl.vm.UserError("AI proposal contained a non-numeric percentage")
+
+            if isinstance(raw_value, bool) or not isinstance(
+                raw_value, (int, float)
+            ):
+                raise gl.vm.UserError(
+                    "AI proposal contained a non-numeric percentage"
+                )
 
             pct = int(raw_value)
 
             if pct < 0 or pct > 100:
-                raise gl.vm.UserError("AI proposal contained an out-of-range percentage")
+                raise gl.vm.UserError(
+                    "AI proposal contained an out-of-range percentage"
+                )
 
             current_pct = int(current_split.get(addr_str, 0))
+
             change = pct - current_pct
+
             if change < 0:
                 change = -change
+
             if change > 15:
                 raise gl.vm.UserError(
                     "AI proposal changed a percentage by more than 15 points"
@@ -349,19 +442,30 @@ class FlowSplit(gl.Contract):
             new_total = new_total + pct
 
         if new_total != 100:
-            raise gl.vm.UserError("AI proposal percentages must sum to exactly 100")
+            raise gl.vm.UserError(
+                "AI proposal percentages must sum to exactly 100"
+            )
 
         # ---- proposal is valid: commit it ----
+
         for contributor in self.contributors:
             addr_str = str(contributor)
+
             self.previous_percentages[contributor] = self.percentages.get(
-                contributor, u256(0)
+                contributor,
+                u256(0)
             )
-            self.percentages[contributor] = u256(proposed[addr_str])
+
+            self.percentages[contributor] = u256(
+                proposed[addr_str]
+            )
 
         self.total_percentage = u256(new_total)
+
         self.ai_proposal_raw = proposal_json
+
         self.rebalance_count = self.rebalance_count + u256(1)
+
         self.period_rebalanced = True
 
     # ---------------- dispute path ----------------
@@ -383,7 +487,11 @@ class FlowSplit(gl.Contract):
         self.dispute_reason[contributor] = reason
 
     @gl.public.write
-    def resolve_dispute(self, contributor: Address, revert_split: bool) -> None:
+    def resolve_dispute(
+        self,
+        contributor: Address,
+        revert_split: bool
+    ) -> None:
         if gl.message.sender_address != self.owner:
             raise gl.vm.UserError("Only the owner can resolve disputes")
 
@@ -392,10 +500,16 @@ class FlowSplit(gl.Contract):
 
         if revert_split:
             new_total = 0
+
             for c in self.contributors:
-                restored = self.previous_percentages.get(c, u256(0))
+                restored = self.previous_percentages.get(
+                    c,
+                    u256(0)
+                )
+
                 self.percentages[c] = restored
                 new_total = new_total + int(restored)
+
             self.total_percentage = u256(new_total)
 
         self.dispute_flag[contributor] = False

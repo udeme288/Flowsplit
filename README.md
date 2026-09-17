@@ -38,23 +38,34 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 =======
 FlowSplit
 
+FlowSplit
+
 FlowSplit is a GenLayer contract for teams that share revenue.
 
 It is made for groups like bands, newsletters, small creator teams, or open-source projects where the amount of work each person does can change over time.
 
-Instead of keeping the same percentage forever, FlowSplit allows the team to review contributions and update the split.
+Instead of keeping the same percentage forever, FlowSplit allows the team to review contributions and update the split based on the work and evidence submitted during each period.
 
 How it works
+
 Contributors register their wallet address.
-The owner gives each contributor a starting percentage.
-The percentages must add up to 100%.
+
+The owner gives each contributor a starting percentage. The percentages must add up to 100%.
+
 A new contribution period is started.
+
 Each contributor submits a short description of their work and a link to supporting evidence.
+
 The period is closed.
+
 The contract uses the submitted information and contribution scores to create a new proposed split.
-The new split is checked before it is saved.
+
+The proposed split is checked by GenLayer validators to determine whether the changes are justified by the contribution evidence, as well as whether the proposal follows the required format and limits.
+
 A contributor's percentage cannot move by more than 15 points in one rebalance.
+
 A contributor can dispute the new split if they believe it is unfair.
+
 Main functions
 register_contributor()
 
@@ -90,14 +101,22 @@ rebalance()
 
 Creates a new proposed split using the contribution information.
 
-Before the new percentages are saved, the contract checks that:
+The GenLayer validators check whether the proposed changes are justified by the submitted contribution evidence.
+
+Before the new percentages are saved, the proposal must satisfy several checks:
 
 Every contributor is included
 Percentages are valid
 The total equals 100
 No percentage changes by more than 15 points
+Increases are supported by meaningful contribution evidence
+Decreases are supported by relatively lower contribution, lack of contribution, or stronger evidence for other contributors
+Unsupported, vague, irrelevant, or contradictory evidence should not justify an increase
+If the evidence does not justify a change, the current percentage should be preserved
 
-If any check fails, the new split is not saved.
+The contribution evidence is therefore considered when determining whether a proposed split is justified, rather than checking only the format and numerical limits.
+
+If any required check fails, the new split is not saved.
 
 dispute_rebalance()
 
@@ -130,11 +149,13 @@ Someone may do much more work in one month and much less the next. A fixed agree
 
 FlowSplit gives the team a way to review the work done during each period and adjust the percentages while keeping limits in place.
 
+The updated validation process also makes the contribution evidence part of the decision, so a percentage change is expected to have a reason connected to the work submitted during the period.
+
 Current limitations
 
 This version deals with percentage accounting only. It does not send the actual revenue or GEN to contributors.
 
-Also, the contract stores the evidence URL but does not currently fetch the page itself to verify it.
+Also, the contract stores the evidence URL but does not currently fetch the page itself to verify it. The validators evaluate the contribution information provided to the contract, but the evidence source itself is not independently fetched by the contract.
 
 Built with
 GenLayer
@@ -143,7 +164,13 @@ GenLayer Storage
 GenLayer Equivalence Principle
 Project status
 
+FlowSplit is a working prototype focused on dynamic revenue splits based on contribution records and evidence.
+
+The current version uses GenLayer validators to check whether proposed percentage changes are justified by the submitted contribution evidence while enforcing the split and movement limits.
+
+The next step would be connecting the percentages to actual payments and improving how submitted evidence is checked.
+Project status
+
 FlowSplit is a working prototype focused on dynamic revenue splits based on contribution records.
 
 The next step would be connecting the percentages to actual payments and improving how submitted evidence is checked.
->>>>>>> f259e103d3b193f0a499ec5d339f4d5e1baec3c6
